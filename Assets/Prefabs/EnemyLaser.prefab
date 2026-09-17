@@ -244,7 +244,7 @@ GameObject:
   - component: {fileID: 5457934}
   - component: {fileID: 11423136}
   m_Layer: 0
-  m_Name: Laser
+  m_Name: EnemyLaser
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -312,7 +312,7 @@ MonoBehaviour:
   lifeTime: 6
   trail: {fileID: 109174}
   hitEffect: {fileID: 124664, guid: 9f960b5cfaf5bbf4d9642721fec5d409, type: 3}
-  launchSound: {fileID: 173942, guid: 7fa99c03c21ff694f9f603e8a7b5d941, type: 3}
+  launchSound: {fileID: 167232, guid: 1a3a5dcd4480d0044bdf83a9e7b1b26c, type: 3}
   flightSound: {fileID: 0}
   hitSound: {fileID: 149020, guid: 54770f60a27eacb489f22fb0cf707b2a, type: 3}
-  target: 1
+  target: 0

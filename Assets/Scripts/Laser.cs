@@ -2,7 +2,12 @@
 using System.Collections;
 
 public class Laser : Projectile {
-
+	private enum Target
+	{
+		Player,
+		Enemy
+	};
+	[SerializeField] Target target;
 	// Use this for initialization
 	void Start () {
 
@@ -25,11 +30,26 @@ public class Laser : Projectile {
 
 
 	void OnTriggerEnter(Collider otherObject){
-		if (otherObject.tag == "Enemy" || otherObject.tag == "Boid" || otherObject.tag == "Environment") {
-			otherObject.SendMessage ("takeDamage", damage, SendMessageOptions.DontRequireReceiver);
-			Instantiate(hitEffect, transform.position, transform.rotation);
-			Instantiate(hitSound, transform.position, transform.rotation);
-			Destroy (this.gameObject);
-		} 
+		if(target == Target.Enemy)
+		{
+			if (otherObject.tag == "Enemy" || otherObject.tag == "Boid" || otherObject.tag == "Environment") 
+			{
+				otherObject.SendMessage ("takeDamage", damage, SendMessageOptions.DontRequireReceiver);
+				Instantiate(hitEffect, transform.position, transform.rotation);
+				Instantiate(hitSound, transform.position, transform.rotation);
+				Destroy (this.gameObject);
+			} 
+		}
+		else if(target == Target.Player)
+		{
+			if(otherObject.tag == "Player")
+			{
+				otherObject.SendMessage ("takeDamage", damage, SendMessageOptions.DontRequireReceiver);
+				Instantiate(hitEffect, transform.position, transform.rotation);
+				Instantiate(hitSound, transform.position, transform.rotation);
+				Destroy (this.gameObject);
+			}
+		}
+		
 	}
 }

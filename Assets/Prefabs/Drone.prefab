@@ -184,7 +184,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d019ed01e7391f748aa5b7dea8fd5f50, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  health: 100
+  health: 200
   deathEffect: {fileID: 168250, guid: 5eb4293102a9d694ebf1affc13c4cff0, type: 3}
   deathSound: {fileID: 103974, guid: 5682ac4627f4d5248bd4fdbc79756da8, type: 3}
   speed: 50
@@ -194,6 +194,11 @@ MonoBehaviour:
   cohesionDistance: 50
   seperationStrength: 250
   cohesionStrength: 25
+  droneBehaviour: 0
+  motherShip: {fileID: 0}
+  scoutPosition: {x: 0, y: 0, z: 0}
+  newResourceObject: {fileID: 0}
+  alienLaser: {fileID: 164730, guid: a3970fa5f32c458418a4261978cd6b1d, type: 3}
 --- !u!1 &1468909202175776
 GameObject:
   m_ObjectHideFlags: 0
