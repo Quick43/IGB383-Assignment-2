@@ -1,6 +1,7 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Runtime.CompilerServices;
+using UnityEditorInternal;
 
 public class Drone : Enemy {
 
@@ -30,6 +31,7 @@ public class Drone : Enemy {
         Idle,
         Scouting,
         Foraging,
+        EliteForaging,
         Attacking,
         Fleeing
     }
@@ -72,7 +74,7 @@ public class Drone : Enemy {
     public int carryCapacity = 50;
     private float gatherTimer;
     private float gatherTime = 3.0f;
-    private GameObject targetResource;
+    public GameObject targetResource;
 
     // Use this for initialization
     void Start() {
@@ -125,19 +127,34 @@ public class Drone : Enemy {
             case DroneBehaviours.Foraging:
                 Foraging();
                 break;
+            case DroneBehaviours.EliteForaging:
+                EliteForaging();
+                break;
         }
     }
 
-    private void Foraging()
+    private void EliteForaging()
     {
-        // Foraging elites ask the mothership which asteroid to move to
         if(targetResource == null)
-            targetResource = motherShip.GetComponent<Mothership>().resourceObjects[0];
+            return;
         // Foraging elite moves towards the asteroid
         if(Vector3.Distance(transform.position, targetResource.transform.position) > targetRadius && targetResource.GetComponent<Asteroid>().resource > 0 && carriedResource < carryCapacity)
             MoveTowardsTarget(targetResource.transform.position);
         else
         {
+            // Every few seconds, check for new resources
+            if(Time.time > detectTimer)
+            {
+                newResourceObject = DetectNewResources();
+                detectTimer = Time.time + detectTime;
+                if(newResourceObject != null)
+                {
+                    motherShip.GetComponent<Mothership>().scouts.Add(gameObject);
+                    motherShip.GetComponent<Mothership>().elites.Remove(gameObject);
+                    droneBehaviour = DroneBehaviours.Scouting;
+                    return;
+                }
+            }
             // Foraging elite slowly gathers the material from the asteroid until it is depleted or it can not carry any more
             if(Time.time > gatherTimer && carriedResource < carryCapacity)
             {
@@ -151,6 +168,43 @@ public class Drone : Enemy {
             if(targetResource.GetComponent<Asteroid>().resource == 0 || carriedResource == carryCapacity)
             {
                 // Foraging elite returns to motehrship and deposits resource
+                if(Vector3.Distance(transform.position, motherShip.transform.position) > targetRadius)
+                    MoveTowardsTarget(motherShip.transform.position);
+                else
+                {
+                    motherShip.GetComponent<Mothership>().drones.Add(gameObject);
+                    motherShip.GetComponent<Mothership>().elites.Remove(gameObject);
+                    motherShip.GetComponent<Mothership>().totalResource += carriedResource;
+                    targetResource = null;
+                    carriedResource = 0;
+                    droneBehaviour = DroneBehaviours.Idle;
+                }
+            }
+        }
+    }
+
+    private void Foraging()
+    {
+        if(targetResource == null)
+            return;
+        // Forager moves towards the asteroid
+        if(Vector3.Distance(transform.position, targetResource.transform.position) > targetRadius && targetResource.GetComponent<Asteroid>().resource > 0 && carriedResource < carryCapacity)
+            MoveTowardsTarget(targetResource.transform.position);
+        else
+        {
+            // Forager slowly gathers the material from the asteroid until it is depleted or it can not carry any more
+            if(Time.time > gatherTimer && carriedResource < carryCapacity)
+            {
+                int resourceToBeTaken = targetResource.GetComponent<Asteroid>().resource = Mathf.Min(targetResource.GetComponent<Asteroid>().resource, pickupAmount);
+                if(resourceToBeTaken + carriedResource > carryCapacity)
+                    resourceToBeTaken = carryCapacity - carriedResource;
+                targetResource.GetComponent<Asteroid>().resource -= resourceToBeTaken;
+                carriedResource += resourceToBeTaken;
+                gatherTimer = Time.time + gatherTime;
+            }
+            if(targetResource.GetComponent<Asteroid>().resource == 0 || carriedResource == carryCapacity)
+            {
+                // Forager returns to motehrship and deposits resource
                 if(Vector3.Distance(transform.position, motherShip.transform.position) > targetRadius)
                     MoveTowardsTarget(motherShip.transform.position);
                 else
@@ -336,7 +390,7 @@ public class Drone : Enemy {
             {
                 motherShip.GetComponent<Mothership>().drones.Add(this.gameObject);
                 motherShip.GetComponent<Mothership>().scouts.Remove(this.gameObject);
-                motherShip.GetComponent<Mothership>().resourceObjects.Add(newResourceObject);
+                motherShip.GetComponent<Mothership>().unassignedResourceObjects.Add(newResourceObject);
                 newResourceVal = 0;
                 newResourceObject = null;
                 droneBehaviour = DroneBehaviours.Idle;
@@ -361,7 +415,7 @@ public class Drone : Enemy {
             }
         }
         // Double check to see if the mothership already knows about it
-        if(motherShip.GetComponent<Mothership>().resourceObjects.Contains(newResourceObject))
+        if(motherShip.GetComponent<Mothership>().unassignedResourceObjects.Contains(newResourceObject) || motherShip.GetComponent<Mothership>().assignedResourceObjects.Contains(newResourceObject))
         {
             return null;
         }

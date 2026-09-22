@@ -3,8 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine.SocialPlatforms.Impl;
 
-public class Mothership : MonoBehaviour {
-
+public class Mothership : Enemy {
+    GameManager gameManager;
     public GameObject enemy;
     public int numberOfEnemies = 20;
 
@@ -13,16 +13,49 @@ public class Mothership : MonoBehaviour {
     // Resource Harvesting Variables
     public List<GameObject> drones = new List<GameObject>();
     public List<GameObject> scouts = new List<GameObject>();
+    public List<GameObject> foragers = new List<GameObject>();
     public List<GameObject> elites = new List<GameObject>();
-    public int maxScouts = 4;
-    public int maxElites = 4;
-    public List<GameObject> resourceObjects = new List<GameObject>();
+    private int maxScouts = 4;
+    private int maxElites = 2;
+    private int maxForagers = 3;
+    public List<GameObject> unassignedResourceObjects = new List<GameObject>();
+    public List<GameObject> assignedResourceObjects = new List<GameObject>();
     private float forageTimer;
     private float forageTime = 10.0f;
     public float totalResource = 0;
 
+    // Beam Weapon
+    public GameObject beamMuzzle;
+    public GameObject beamTarget;
+    public LineRenderer beam;
+    private float beamFireRate = 3.0f;
+    private float beamFireTime;
+    private float beamFireDuration = 1.5f;
+
+    // Shield
+    public float shield = 5000;
+    public GameObject shieldObject;
+
+    public override void takeDamage(float dmg)
+    {
+        // Take damage with regards to active shield value
+        if(shield > dmg)
+        {
+            shield -= dmg;
+            dmg = 0;
+        }
+        else if(shield <= dmg)
+        {
+            dmg -= shield;
+            shield = 0;
+            shieldObject.SetActive(false);
+        }
+        health -= dmg;
+    }
+
     // initialise the boids
     void Start() {
+        gameManager = GameObject.FindGameObjectWithTag("GameManager").GetComponent<GameManager>();
 
         for (int i = 0; i < numberOfEnemies; i++) {
 
@@ -48,41 +81,65 @@ public class Mothership : MonoBehaviour {
             scouts[scouts.Count - 1].GetComponent<Drone>().droneBehaviour = Drone.DroneBehaviours.Scouting;
         }
         // Once resources have been found, initialise elites
-        if(elites.Count < maxElites && resourceObjects.Count != 0)
+        if(unassignedResourceObjects.Count >= 5 && elites.Count < maxElites && foragers.Count < maxForagers)
         {
-            GameObject elite = GetBestElite();
-            elites.Add(elite);
-            drones.Remove(elite);
-            elites[elites.Count - 1].GetComponent<Drone>().droneBehaviour = Drone.DroneBehaviours.Foraging;
+            AssignForagers();  
         }
         // (Re)Determine best resource objects periodically
-        if(resourceObjects.Count > 0 && Time.time > forageTimer)
+        if(unassignedResourceObjects.Count > 0 && Time.time > forageTimer)
         {
             // Sort resource objects delegated by their resource amount
-            resourceObjects.Sort(delegate(GameObject a, GameObject b) {
+            unassignedResourceObjects.Sort(delegate(GameObject a, GameObject b) {
                 return b.GetComponent<Asteroid>().resource.CompareTo(a.GetComponent<Asteroid>().resource);
             });
             forageTimer = Time.time + forageTime;
         }
+        // Fire beam weapon
+        if(gameManager.gameStarted)
+        {
+            FireBeam();
+        }
     }
 
-    private GameObject GetBestElite()
+    private void AssignForagers()
     {
-        int bestEliteIndex = 0;
-        float bestScore = 0;
-        float speedWeight = 0.35f;
-        float carryWeight = 0.45f;
-        float healthWeight = 0.2f;
-        for(int i = 0; i < drones.Count; i++)
+        float speedWeight = 0.3f;
+        float carryWeight = 0.2f;
+        float resourceWeight = 0.4f;
+        float distanceWeight = 0.1f;
+        for(int i = 0; i < 5; i++)
         {
-            float score = drones[i].GetComponent<Drone>().speed * speedWeight + drones[i].GetComponent<Drone>().health * healthWeight + drones[i].GetComponent<Drone>().carryCapacity * carryWeight;
-            if(score > bestScore)
+            float bestScore = 0;
+            int bestDroneIndex = 0;
+            GameObject thisResourceObject = unassignedResourceObjects[i];
+            Asteroid thisAsteroid = thisResourceObject.GetComponent<Asteroid>();
+            for(int j = 0; j < drones.Count; j++)
             {
-                bestScore = score;
-                bestEliteIndex = i;
+                Drone thisDrone = drones[j].GetComponent<Drone>();
+                float score = thisDrone.speed * speedWeight + thisDrone.carryCapacity * carryWeight + thisAsteroid.resource * resourceWeight - Vector3.Distance(transform.position, thisResourceObject.transform.position) * distanceWeight;
+                if(score > bestScore)
+                    bestDroneIndex = j;
+            }
+            GameObject bestDrone = drones[bestDroneIndex];
+            if(i < 3)
+            {
+                elites.Add(bestDrone);
+                drones.Remove(bestDrone);
+                bestDrone.GetComponent<Drone>().droneBehaviour = Drone.DroneBehaviours.EliteForaging;
+                bestDrone.GetComponent<Drone>().targetResource = thisResourceObject;
+            }
+            else
+            {
+                foragers.Add(bestDrone);
+                drones.Remove(bestDrone);
+                foragers[foragers.Count - 1].GetComponent<Drone>().droneBehaviour = Drone.DroneBehaviours.Foraging;
             }
         }
-        return drones[bestEliteIndex];
+        for(int i = 0; i < 5; i++)
+        {
+            assignedResourceObjects.Add(unassignedResourceObjects[i]);
+            unassignedResourceObjects.Remove(unassignedResourceObjects[i]);
+        }
     }
 
     private GameObject GetBestScout()
@@ -102,5 +159,49 @@ public class Mothership : MonoBehaviour {
         }
         return drones[bestScoutIndex];
     }
+
+    // Mothership Beam weapon firing
+    private void FireBeam()
+    {
+        // Raycast hit object - out parameter
+        RaycastHit hit;
+        // If time to fire within LOS of the player
+        if(Time.time > beamFireTime && Physics.Raycast(beamMuzzle.transform.position, -(beamMuzzle.transform.position - gameManager.playerDreadnaught.transform.position).normalized, out hit, 1000.0f))
+        {
+            // rotate beam empty towards player
+            beamMuzzle.transform.LookAt(gameManager.playerDreadnaught.transform.position);
+            // Turn beam renderer on
+            beam.enabled = true;
+            // Set draw for origin of beam
+            beam.SetPosition(0, beamMuzzle.transform.position);
+            // set default position for destination of beam
+            beam.SetPosition(1, beamTarget.transform.position);
+            // Animate beam texture
+            beam.material.SetTextureOffset("_MainTex", new Vector2(-Time.time * 3, 0.0f));
+            // Playe beam sound
+            if(!GetComponent<AudioSource>().isPlaying)
+            {
+                GetComponent<AudioSource>().Play();
+            }
+            // If the beam is intercepted by the player
+            if(hit.transform.tag == "Player")
+            {
+                // Set player position for destination of beam
+                beam.SetPosition(1, hit.transform.position);
+            }
+        }
+        else
+        {
+            beam.enabled = false;
+            GetComponent<AudioSource>().Stop();
+        }
+        // Cooldown Beam
+        if(Time.time >= beamFireTime + beamFireDuration)
+        {
+            beam.enabled = false;
+            beamFireTime = Time.time + beamFireRate;
+        }
+    }
 }
+
 
