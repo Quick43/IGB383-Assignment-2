@@ -61,7 +61,6 @@ public class Drone : Enemy {
     [SerializeField] private GameObject alienLaser;
 
     // Fleeing Targeting
-    private Vector3 predictedPos;
     private Vector3 fleePos;
     private float hunterRadius = 80.0f;
 
@@ -76,6 +75,11 @@ public class Drone : Enemy {
     private float gatherTime = 3.0f;
     public GameObject targetResource;
 
+    // Resupply variables
+    private float resupplyTimer;
+    private float resupplyTime = 5.0f;
+    private float healAmount = 10.0f;
+
     // Use this for initialization
     void Start() {
 
@@ -86,6 +90,7 @@ public class Drone : Enemy {
 
         // Randomise variables for heuristic
         health = Random.Range(200, 400);
+        maxHealth = health;
         speed = Random.Range(25, 75);
         alienLaser.GetComponent<Laser>().damage = Random.Range(25, 125);
         carryCapacity = Random.Range(25, 100);
@@ -99,7 +104,7 @@ public class Drone : Enemy {
         {
             target = gameManager.playerDreadnaught;
             // Heuristic function here
-            attackOrFlee = health * Friends();
+            attackOrFlee = health * Friends() * FriendsHealth();
             if(attackOrFlee >= 1000)
                 droneBehaviour = DroneBehaviours.Attacking;
             else if(attackOrFlee < 1000)
@@ -115,6 +120,9 @@ public class Drone : Enemy {
         // Drone Behaviours - State Switching
         switch (droneBehaviour)
         {
+            case DroneBehaviours.Idle:
+                Resupply();
+                break;
             case DroneBehaviours.Scouting:
                 Scouting();
                 break;
@@ -233,6 +241,19 @@ public class Drone : Enemy {
         return clusterStrength;
     }
 
+    private int FriendsHealth()
+    {
+        float totalHealth = 0;
+        for(int i =0; i < gameManager.enemyList.Length; i++)
+        {
+            if(Vector3.Distance(transform.position, gameManager.enemyList[i].transform.position) < targetRadius)
+            {
+                totalHealth += gameManager.enemyList[i].GetComponent<Enemy>().health;
+            }
+        }
+        return (int)totalHealth;
+    }
+
     private void Attacking()
     {
         // Calculate target's velocity
@@ -291,7 +312,20 @@ public class Drone : Enemy {
 
     private void Resupply()
     {
-        
+        if (Vector3.Distance(transform.position, motherShip.transform.position) < targetRadius)
+            MoveTowardsTarget(motherShip.transform.position);
+        else
+        {
+            if(health == maxHealth)
+                return;
+            if(Time.time > resupplyTimer)
+            {
+                health += healAmount;
+                if(health > maxHealth)
+                    health = maxHealth;
+                resupplyTimer = Time.time + resupplyTime;
+            }
+        }
     }
 
     private void MoveTowardsTarget(Vector3 targetPos) {

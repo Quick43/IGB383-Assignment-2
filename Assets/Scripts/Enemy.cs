@@ -5,6 +5,7 @@ using UnityEngine;
 public class Enemy : MonoBehaviour {
 
     public float health = 100;
+    public float maxHealth= 100;
 
     public GameObject deathEffect;
     public GameObject deathSound;
